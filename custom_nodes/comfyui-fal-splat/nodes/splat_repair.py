@@ -404,11 +404,16 @@ class FluxSplatRepair:
                     "fal-ai/flux-2/klein/9b/base/edit/lora",
                     "fal-ai/flux-2/klein/9b/edit/lora",
                     "fal-ai/flux-2/klein/4b/edit/lora",
+                    "fal-ai/qwen-image-edit",
+                    "fal-ai/qwen-image-edit-2511/lora",
                 ], {"default": "fal-ai/flux-2/klein/9b/base/edit/lora"}),
                 # LoRA
-                "lora_url": ("STRING", {
-                    "default": "https://huggingface.co/cyrildiagne/flux2-klein9b-lora-mlsharp-3d-repair/resolve/main/flux2-klein9b-lora-mlsharp-3d-repair.safetensors",
-                    "tooltip": "mlsharp 3D repair LoRA URL"}),
+                "lora_url": ([
+                    "https://huggingface.co/cyrildiagne/flux2-klein9b-lora-mlsharp-3d-repair/resolve/main/flux2-klein9b-lora-mlsharp-3d-repair.safetensors",
+                    "https://huggingface.co/dx8152/Qwen-Image-Edit-2511-Gaussian-Splash/resolve/main/%E9%AB%98%E6%96%AF%E6%B3%BC%E6%BA%85-Sharp.safetensors",
+                    "none",
+                ], {"default": "https://huggingface.co/cyrildiagne/flux2-klein9b-lora-mlsharp-3d-repair/resolve/main/flux2-klein9b-lora-mlsharp-3d-repair.safetensors",
+                    "tooltip": "Select the LoRA URL. To use a custom URL, right-click the node -> Convert lora_url to input."}),
                 "lora_scale": ("FLOAT", {"default": 1.4, "min": 0.0, "max": 2.0, "step": 0.05,
                     "tooltip": "LoRA weight. 1.4 works best for repair."}),
                 # Generation params
@@ -543,7 +548,7 @@ class FluxSplatRepair:
 
         # ── 4. Build LoRA list ─────────────────────────────────────────────
         loras = []
-        if lora_url and lora_url.strip():
+        if lora_url and lora_url.strip() and lora_url.strip().lower() != "none":
             clean_url = lora_url.strip().replace("/blob/", "/resolve/")
             loras.append({"path": clean_url, "scale": lora_scale})
 
