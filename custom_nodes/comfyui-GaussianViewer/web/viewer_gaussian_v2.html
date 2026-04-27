@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeomPack Gaussian Splat Viewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --ui-scale: 1.0;
+        }
+
+        body {
+            background: #1a1a1a;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #viewerContainer {
+            position: relative;
+            flex: 1;
+            min-height: 0;
+        }
+
+        #canvasWrapper {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #ff6b6b;
+            padding: 20px;
+            max-width: 80%;
+        }
+
+        .error.hidden {
+            display: none;
+        }
+
+        #controlsBar {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+            align-items: center;
+            gap: calc(6px * var(--ui-scale)) calc(10px * var(--ui-scale));
+            background: #252525;
+            padding: calc(6px * var(--ui-scale)) calc(10px * var(--ui-scale));
+            border-top: 1px solid #333;
+            flex-shrink: 0;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: calc(4px * var(--ui-scale));
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid #3a3a3a;
+            border-radius: calc(6px * var(--ui-scale));
+            padding: calc(4px * var(--ui-scale)) calc(6px * var(--ui-scale));
+            min-height: calc(30px * var(--ui-scale));
+        }
+
+        .control-group.preset-group {
+            margin-left: auto;
+        }
+
+        .group-label {
+            color: #a9a9a9;
+            font-size: calc(10px * var(--ui-scale));
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            margin-right: calc(2px * var(--ui-scale));
+            white-space: nowrap;
+        }
+
+        @media (max-width: 900px) {
+            .control-group.preset-group {
+                margin-left: 0;
+            }
+        }
+
+        #controlsBar button {
+            background: #444;
+            border: none;
+            color: #fff;
+            padding: calc(4px * var(--ui-scale)) calc(8px * var(--ui-scale));
+            border-radius: calc(3px * var(--ui-scale));
+            cursor: pointer;
+            font-size: calc(10px * var(--ui-scale));
+            white-space: nowrap;
+        }
+
+        #controlsBar button:hover {
+            background: #555;
+        }
+
+        .scale-control {
+            display: flex;
+            align-items: center;
+            gap: calc(4px * var(--ui-scale));
+            flex-shrink: 0;
+        }
+
+        .scale-control span {
+            color: #888;
+            font-size: calc(10px * var(--ui-scale));
+            white-space: nowrap;
+        }
+
+        .scale-control input[type="number"] {
+            width: calc(50px * var(--ui-scale));
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            font-size: calc(10px * var(--ui-scale));
+            padding: calc(3px * var(--ui-scale)) calc(5px * var(--ui-scale));
+            border-radius: calc(3px * var(--ui-scale));
+        }
+
+        .scale-control input[type="range"] {
+            width: calc(60px * var(--ui-scale));
+            margin: 0;
+            vertical-align: middle;
+        }
+
+        /* Adjustments for new integer scale slider */
+        #gaussianScaleValue {
+            width: calc(80px * var(--ui-scale));
+        }
+        #gaussianScaleDisplay {
+            color: #fff;
+            font-size: calc(10px * var(--ui-scale));
+            min-width: 16px;
+            text-align: center;
+        }
+
+        .preset-control {
+            display: flex;
+            align-items: center;
+            gap: calc(4px * var(--ui-scale));
+            flex-shrink: 0;
+        }
+
+        .preset-control span {
+            color: #888;
+            font-size: calc(10px * var(--ui-scale));
+            white-space: nowrap;
+        }
+
+        .preset-control input,
+        .preset-control select {
+            background: #333;
+            border: 1px solid #555;
+            color: #fff;
+            font-size: calc(10px * var(--ui-scale));
+            padding: calc(3px * var(--ui-scale)) calc(5px * var(--ui-scale));
+            border-radius: calc(3px * var(--ui-scale));
+        }
+
+        #presetName {
+            width: calc(120px * var(--ui-scale));
+        }
+
+        #presetSelect {
+            min-width: calc(140px * var(--ui-scale));
+            max-width: calc(220px * var(--ui-scale));
+        }
+
+        #presetStatus {
+            color: #9ad;
+            font-size: calc(10px * var(--ui-scale));
+            min-width: calc(80px * var(--ui-scale));
+        }
+
+        #overlayControl {
+            display: none;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.7);
+            padding: 8px 12px;
+            border-radius: 4px;
+            color: #aaa;
+            font-size: 11px;
+            font-family: monospace;
+            z-index: 50;
+        }
+
+        .info-panel.hidden {
+            display: none;
+        }
+
+        #cropFrame {
+            position: absolute;
+            border: 2px solid rgba(255, 80, 80, 0.85);
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.15);
+            pointer-events: none;
+            z-index: 40;
+        }
+
+        .ratio-panel {
+            position: absolute;
+            left: 8px;
+            bottom: 8px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 8px;
+            display: grid;
+            grid-template-columns: auto;
+            gap: 6px;
+            z-index: 45;
+        }
+
+        .ratio-panel .label {
+            color: #cfcfcf;
+            font-size: 11px;
+        }
+
+        .ratio-select {
+            background: #222;
+            color: #ddd;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 4px 6px;
+            font-size: 11px;
+            min-width: 110px;
+        }
+    </style>
+</head>
+<body>
+    <div id="viewerContainer">
+        <div id="canvasWrapper">
+            <canvas id="canvas"></canvas>
+            <img id="overlayImage" style="position: absolute; pointer-events: none; opacity: 0.5; display: none; z-index: 35;">
+            <div id="cropFrame" aria-hidden="true"></div>
+        </div>
+
+        <div id="error" class="error hidden"></div>
+
+        <div id="infoPanel" class="info-panel hidden">
+            <div id="infoContent"></div>
+        </div>
+
+        <div id="ratioPanel" class="ratio-panel" aria-label="Aspect ratio presets">
+            <div class="label">Image Ratio</div>
+            <select id="ratioSelect" class="ratio-select">
+                <option value="source">Source</option>
+                <option value="1:1">1:1</option>
+                <option value="1:2">1:2</option>
+                <option value="4:3">4:3</option>
+                <option value="3:4">3:4</option>
+                <option value="16:9">16:9</option>
+                <option value="9:16">9:16</option>
+            </select>
+        </div>
+
+        <div id="cameraInfo" class="info-panel" style="left: auto; right: 8px; font-size: 9px; line-height: 1.2;">
+            <div id="cameraInfoContent"></div>
+        </div>
+
+        <div id="helpPanel" class="info-panel hidden" style="left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 100; min-width: 250px;">
+            <div style="font-weight: bold; border-bottom: 1px solid #444; margin-bottom: 8px; padding-bottom: 4px; color: #fff;">Keyboard Shortcuts</div>
+            <div style="display: grid; grid-template-columns: auto 1fr; gap: 4px 16px;">
+                <span style="color: #6cc;">WASD / Arrows</span> <span>Move / Pan</span>
+                <span style="color: #6cc;">Q / E</span> <span>Yaw (Left/Right)</span>
+                <span style="color: #6cc;">R / F</span> <span>Pitch (Up/Down)</span>
+                <span style="color: #6cc;">Z / C</span> <span>Roll</span>
+                <span style="color: #6cc;">Shift</span> <span>Precision (0.1x)</span>
+                <span style="color: #6cc;">Left Click</span> <span>Orbit</span>
+                <span style="color: #6cc;">Right Click</span> <span>Pan</span>
+                <span style="color: #6cc;">Scroll</span> <span>Zoom</span>
+            </div>
+            <button id="closeHelp" style="margin-top: 12px; width: 100%; background: #444; border: none; color: #fff; padding: 6px; cursor: pointer; border-radius: 3px;">Close</button>
+        </div>
+    </div>
+
+    <div id="controlsBar">
+        <div class="control-group view-group">
+            <span class="group-label">View</span>
+            <button id="resetCamera" title="Reset camera view">Reset View</button>
+            <button id="toggleHelp" title="Show keyboard shortcuts">?</button>
+        </div>
+
+        <div class="control-group camera-group">
+            <span class="group-label">Camera</span>
+            <div class="scale-control">
+                <span>Focal:</span>
+                <input type="range" id="focalScale" min="0.2" max="3.0" step="0.01" value="1.0" title="Focal length scale">
+                <input type="number" id="focalScaleValue" min="0.2" max="3.0" step="0.01" value="1.0" title="Focal length scale value">
+            </div>
+            <button id="setCamera" title="Save current camera for render">Set Camera</button>
+        </div>
+
+        <div class="control-group display-group">
+            <span class="group-label">Display</span>
+            <div class="scale-control">
+                <span>Scale:</span>
+                <input type="range" id="gaussianScaleValue" min="1" max="30" step="1" value="11" title="Gaussian scale multiplier">
+                <span id="gaussianScaleDisplay">11</span>
+                <button id="autoScaleBtn" title="Reset Scale to Auto (11)">Auto</button>
+                <label style="display: flex; align-items: center; gap: 4px; color: #ccc; font-size: calc(10px * var(--ui-scale)); margin-left: calc(8px * var(--ui-scale)); cursor: pointer;" title="Dynamically adjust scale based on camera distance and FOV">
+                    <input type="checkbox" id="dynamicScaleToggle" style="margin: 0; cursor: pointer;" checked>
+                    Dynamic
+                </label>
+            </div>
+            <div id="overlayControl" class="scale-control">
+                <span>Overlay:</span>
+                <input type="range" id="overlayAlpha" min="0" max="1" step="0.01" value="0.5" title="Overlay image transparency">
+                <input type="number" id="overlayAlphaValue" min="0" max="1" step="0.01" value="0.5" title="Overlay alpha value">
+            </div>
+        </div>
+
+        <div class="control-group preset-group">
+            <span class="group-label">Presets</span>
+            <div class="preset-control">
+                <span>Preset:</span>
+                <select id="presetScope" title="Preset scope">
+                    <option value="global">Global</option>
+                    <option value="mesh">Current Mesh</option>
+                </select>
+                <input type="text" id="presetName" placeholder="preset name" title="Preset name">
+                <button id="savePreset" title="Save current camera as preset">Save</button>
+                <select id="presetSelect" title="Select a preset">
+                    <option value="">(No Preset)</option>
+                </select>
+                <button id="applyPreset" title="Apply selected preset">Apply</button>
+                <button id="deletePreset" title="Delete selected preset">Delete</button>
+                <span id="presetStatus"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load bundled gsplat.js -->
+    <script src="./js/gsplat-bundle.js"></script>
+    <script src="./js/precise_orbit_controls.js"></script>
+
+    <script type="module">
+        // Use the globally exported GSPLAT
+        const SPLAT = window.GSPLAT;
+
+        // DOM elements
+        const canvas = document.getElementById('canvas');
+        const errorEl = document.getElementById('error');
+        const infoPanel = document.getElementById('infoPanel');
+        const infoContent = document.getElementById('infoContent');
+        const cropFrame = document.getElementById('cropFrame');
+
+        // gsplat.js components
+        let scene = null;
+        let camera = null;
+        let renderer = null;
+        let controls = null;
+        let animationId = null;
+        let currentSplat = null;
+        let originalScales = null;  // Store original scales for dynamic adjustment
+        let cachedSplatData = null; // Keep a copy of buffers to reattach after worker detaches
+        let baseFocalLength = null;
+        let baseFocalY = null;
+        let nativeAspect = null;
+        let nativeImageWidth = null;
+        let nativeImageHeight = null;
+        let lastCameraTarget = null;
+        let lastSceneCenter = null;
+        let lastSceneSize = null;
+
+        let baseDistance = null;
+        let isDynamicScaleEnabled = true;
+
+        function updateBaseDistance() {
+            if (!camera || !lastSceneCenter) return;
+            const pos = initialCameraData ? initialCameraData.position : camera.position;
+            const dx = pos.x - lastSceneCenter.x;
+            const dy = pos.y - lastSceneCenter.y;
+            const dz = pos.z - lastSceneCenter.z;
+            baseDistance = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1.0;
+            console.log('[GaussianViewer] Base distance set to:', baseDistance.toFixed(2));
+        }
+
+        // Default focal length
+        const DEFAULT_FOCAL_LENGTH = 30;
+        const SCALE_DENSITY_BOOST = 3.0;
+
+        const computeScaleCompensation = (imageWidth, containerWidth) => {
+            if (!imageWidth || !containerWidth) return 1.0;
+            const ratio = imageWidth / containerWidth;
+            return ratio * SCALE_DENSITY_BOOST;
+        };
+
+        // Initialize the viewer
+        function initViewer() {
+            console.log('[GaussianViewer] ===== INITIALIZING VIEWER =====');
+            try {
+                console.log('[GaussianViewer] Creating scene...');
+                scene = new SPLAT.Scene();
+                
+                console.log('[GaussianViewer] Creating camera...');
+                camera = new SPLAT.Camera();
+                
+                console.log('[GaussianViewer] Creating renderer...');
+                renderer = new SPLAT.WebGLRenderer(canvas);
+                
+                console.log('[GaussianViewer] Creating orbit controls...');
+                controls = new window.PreciseOrbitControls(camera, canvas);
+
+                // Log zoom bounds and current zoom to help diagnose scroll limits.
+                console.log('[GaussianViewer] OrbitControls zoom bounds:', {
+                    minZoom: controls.minZoom,
+                    maxZoom: controls.maxZoom
+                });
+                controls.minZoom = 0.001;
+                controls.maxZoom = 100;
+
+                // Set default focal length
+                console.log('[GaussianViewer] Setting default focal length...');
+                console.log(`[GaussianViewer] DEFAULT_FOCAL_LENGTH = ${DEFAULT_FOCAL_LENGTH}`);
+                camera.data.fx = DEFAULT_FOCAL_LENGTH;
+                camera.data.fy = DEFAULT_FOCAL_LENGTH;
+                baseFocalLength = camera.data.fx;
+                baseFocalY = camera.data.fy;
+                console.log(`[GaussianViewer] Applied focal length: fx=${camera.data.fx}, fy=${camera.data.fy}`);
+                console.log(`[GaussianViewer] Base focal length stored: baseFx=${baseFocalLength}, baseFy=${baseFocalY}`);
+                
+                // Calculate and log FOV for default settings
+                const canvasHeight = canvas.clientHeight || 512;
+                const defaultFovY = 2 * Math.atan(canvasHeight / (2 * camera.data.fy));
+                const defaultFovYDeg = defaultFovY * 180 / Math.PI;
+                console.log(`[GaussianViewer] Default FOV Y (with canvas height ${canvasHeight}): ${defaultFovYDeg.toFixed(2)} degrees`);
+
+                // Handle resize
+                const resize = () => {
+                    // Only resize renderer if resolution is NOT locked
+                    if (!isResolutionLocked) {
+                        renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+                        nativeAspect = (canvas.clientWidth || 1) / (canvas.clientHeight || 1);
+                    }
+                    scheduleFrameLayoutUpdate();
+                };
+                window.addEventListener('resize', resize);
+                resize();
+                scheduleFrameLayoutUpdate();
+
+                // Start render loop
+                let lastIdealScale = -1;
+
+                const frame = () => {
+                    controls.update();
+                    updateCameraInfoDisplay();
+                    renderer.render(scene, camera);
+                    animationId = requestAnimationFrame(frame);
+
+                    // Real-Time Dynamic Scale Update
+                    if (isDynamicScaleEnabled && camera && lastSceneCenter && baseDistance) {
+                        const currentFocal = camera.data.fx || baseFocalLength;
+                        
+                        const dx = camera.position.x - lastSceneCenter.x;
+                        const dy = camera.position.y - lastSceneCenter.y;
+                        const dz = camera.position.z - lastSceneCenter.z;
+                        const currentDistance = Math.sqrt(dx*dx + dy*dy + dz*dz) || 1.0;
+                        
+                        const distRatio = currentDistance / baseDistance;
+                        const focalRatio = baseFocalLength / currentFocal;
+                        
+                        // Scale factoring with dampening curve so it scales smoothly
+                        const scaleFactor = Math.pow(distRatio * focalRatio, 0.85); 
+                        let idealScale = Math.round(11.0 * scaleFactor);
+                        idealScale = Math.max(1, Math.min(30, idealScale));
+                        
+                        // Only attempt to dispatch an update if the integer value boundary actually changed
+                        if (idealScale !== lastIdealScale) {
+                            lastIdealScale = idealScale;
+                            if (idealScale !== currentScale) {
+                                updateGaussianScale(idealScale);
+                            }
+                        }
+                    }
+                };
+                frame();
+
+                // Diagnostic: log wheel zoom input and resulting camera state.
+                canvas.addEventListener('wheel', (event) => {
+                    const target = getCameraTarget();
+                    let distance = null;
+                    if (camera && target) {
+                        const dx = camera.position.x - target.x;
+                        const dy = camera.position.y - target.y;
+                        const dz = camera.position.z - target.z;
+                        distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    }
+                    if (event.deltaY < 0 && camera && target && distance !== null) {
+                        const minZoom = controls?.minZoom ?? 0;
+                        const dollyThreshold = minZoom + 0.5;
+                        if (distance <= dollyThreshold) {
+                            const dx = target.x - camera.position.x;
+                            const dy = target.y - camera.position.y;
+                            const dz = target.z - camera.position.z;
+                            const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+                            const stepBase = lastSceneSize ? Math.max(lastSceneSize.z, lastSceneSize.x, lastSceneSize.y) : 1;
+                            const step = Math.max(0.05, stepBase * 0.01);
+                            const dirX = dx / len;
+                            const dirY = dy / len;
+                            const dirZ = dz / len;
+                            camera.position.x += dirX * step;
+                            camera.position.y += dirY * step;
+                            camera.position.z += dirZ * step;
+                            const nextTarget = new SPLAT.Vector3(
+                                target.x + dirX * step,
+                                target.y + dirY * step,
+                                target.z + dirZ * step
+                            );
+                            if (controls?.setCameraTarget) {
+                                controls.setCameraTarget(nextTarget);
+                            }
+                            console.log('[GaussianViewer] Dolly forward', {
+                                step,
+                                distance,
+                                target: nextTarget
+                            });
+                        }
+                    }
+                }, { passive: true });
+
+                console.log('[GaussianViewer] Initialized successfully');
+            } catch (err) {
+                console.error('[GaussianViewer] Init error:', err);
+                showError('Failed to initialize WebGL viewer: ' + err.message);
+            }
+        }
+
+        // Show error
+        function showError(message) {
+            errorEl.textContent = message;
+            errorEl.classList.remove('hidden');
+        }
+
+        // Store initial camera params for reset
+        let initialCameraData = null;
+        let lastMeshSignature = null;
+
+        // Resolution lock state
+        let isResolutionLocked = false;
+
+        // Scale compensation: when focal length is scaled down for canvas size,
+        // gaussian scales need to be multiplied by this factor to maintain correct screen-space size
+        let gaussianScaleCompensation = 1.0;
+        let outputSettings = {
+            resolution: 1024,
+            aspectRatio: "source"
+        };
+
+        const CAMERA_PRESET_STORAGE_KEY = 'geompack_camera_presets_v1';
+        let currentMeshKey = null;
+        let presetOptionMap = new Map();
+        const pendingPresetConfirmResolvers = new Map();
+
+        function requestPresetConfirm(options = {}) {
+            return new Promise((resolve) => {
+                const requestId = `preset_confirm_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+                const timeout = setTimeout(() => {
+                    pendingPresetConfirmResolvers.delete(requestId);
+                    resolve(false);
+                }, 30000);
+
+                pendingPresetConfirmResolvers.set(requestId, (result) => {
+                    clearTimeout(timeout);
+                    resolve(!!result);
+                });
+
+                window.parent.postMessage({
+                    type: 'PRESET_CONFIRM_REQUEST',
+                    request_id: requestId,
+                    title: options.title || 'Confirm',
+                    message: options.message || 'Please confirm this operation.',
+                    confirm_text: options.confirmText || 'Confirm',
+                    cancel_text: options.cancelText || 'Cancel',
+                    level: options.level || 'info',
+                    timestamp: Date.now()
+                }, '*');
+            });
+        }
+
+        // Resume the animation loop (used after pausing for screenshot/clipboard)
+        function resumeAnimationLoop() {
+            const frame = () => {
+                controls.update();
+                updateCameraInfoDisplay();
+                renderer.render(scene, camera);
+                animationId = requestAnimationFrame(frame);
+            };
+            frame();
+        }
+
+        // Set camera from extrinsics and intrinsics
+        function setCameraFromExtrinsics(extrinsics, intrinsics, splat) {
+            if (!camera || !controls) return;
+
+            console.log('[GaussianViewer] Setting camera from extrinsics/intrinsics');
+            console.log('[GaussianViewer] Extrinsics:', JSON.stringify(extrinsics));
+            console.log('[GaussianViewer] Intrinsics:', JSON.stringify(intrinsics));
+
+            let camPosX = 0, camPosY = 0, camPosZ = 0;
+
+            if (extrinsics && Array.isArray(extrinsics) && extrinsics.length === 4) {
+                const R = [
+                    [extrinsics[0][0], extrinsics[0][1], extrinsics[0][2]],
+                    [extrinsics[1][0], extrinsics[1][1], extrinsics[1][2]],
+                    [extrinsics[2][0], extrinsics[2][1], extrinsics[2][2]]
+                ];
+                const t = [extrinsics[0][3], extrinsics[1][3], extrinsics[2][3]];
+
+                camPosX = -(R[0][0] * t[0] + R[1][0] * t[1] + R[2][0] * t[2]);
+                camPosY = -(R[0][1] * t[0] + R[1][1] * t[1] + R[2][1] * t[2]);
+                camPosZ = -(R[0][2] * t[0] + R[1][2] * t[1] + R[2][2] * t[2]);
+
+                console.log('[GaussianViewer] Computed camera position from extrinsics:', camPosX, camPosY, camPosZ);
+            }
+
+            let targetZ = 2; // default
+            if (intrinsics && Array.isArray(intrinsics) && intrinsics.length >= 2) {
+                const fx = intrinsics[0][0];
+                const fy = intrinsics[1][1];
+                const cx = intrinsics[0][2];
+                const cy = intrinsics[1][2];
+                const imageWidth = cx * 2;  
+                const imageHeight = cy * 2; 
+
+                console.log('[GaussianViewer] Intrinsics: fx=', fx, 'fy=', fy, 'cx=', cx, 'cy=', cy);
+                console.log('[GaussianViewer] Image dimensions (from intrinsics):', imageWidth, 'x', imageHeight);
+
+                isResolutionLocked = true;
+                
+                const containerWidth = canvas.clientWidth || 512;
+                const containerHeight = canvas.clientHeight || 512;
+
+                console.log(`[GaussianViewer] Locking resolution to native: ${imageWidth}x${imageHeight}`);
+                renderer.setSize(imageWidth, imageHeight);
+                
+                nativeAspect = imageWidth / imageHeight;
+                updateCanvasDisplaySize();
+
+                camera.data.fx = fx;
+                camera.data.fy = fy;
+                baseFocalLength = fx;
+                baseFocalY = fy;
+
+                gaussianScaleCompensation = computeScaleCompensation(imageWidth, containerWidth);
+
+                console.log('[GaussianViewer] Native resolution:', imageWidth, 'x', imageHeight);
+                console.log('[GaussianViewer] Container size:', containerWidth, 'x', containerHeight);
+                console.log('[GaussianViewer] Gaussian scale compensation (with boost):', gaussianScaleCompensation.toFixed(2), 'x');
+
+                const fovY = 2 * Math.atan(imageHeight / (2 * fy));
+                const fovYDeg = fovY * 180 / Math.PI;
+                console.log('[GaussianViewer] Calculated FOV:', fovYDeg, 'degrees');
+
+                targetZ = Math.max(1, fy / imageHeight * 2);
+                console.log('[GaussianViewer] Target Z distance:', targetZ);
+            }
+
+            let targetX = 0, targetY = 0;
+            let orbitZ = targetZ;  
+            if (splat && splat.bounds) {
+                const center = splat.bounds.center();
+                const size = splat.bounds.size();
+
+                targetZ = center.z;
+
+                const minZ = center.z - size.z / 2;
+                orbitZ = minZ * 1.5;  
+
+                console.log('[GaussianViewer] Scene center:', center.x, -center.y, center.z);
+                console.log('[GaussianViewer] Closest point Z:', minZ.toFixed(1));
+                console.log('[GaussianViewer] Orbit center Z:', orbitZ.toFixed(1), '(closest + 50%)');
+                lastSceneCenter = center;
+                lastSceneSize = size;
+            }
+
+            camPosY = -camPosY;
+
+            const camPos = new SPLAT.Vector3(camPosX, camPosY, camPosZ);
+            const targetPos = new SPLAT.Vector3(targetX, targetY, orbitZ);
+
+            initialCameraData = {
+                position: camPos,
+                target: targetPos,
+                fx: camera.data.fx,
+                fy: camera.data.fy
+            };
+
+            camera.position.x = camPosX;
+            camera.position.y = camPosY;
+            camera.position.z = camPosZ;
+
+            controls.setCameraTarget(targetPos);
+
+            console.log('[GaussianViewer] Camera set to position:', camPosX, camPosY, camPosZ);
+            console.log('[GaussianViewer] Looking at target:', targetX, targetY, targetZ);
+            console.log('[GaussianViewer] This should match the original input image view');
+        }
+
+        function buildMeshSignature(filename, intrinsics) {
+            const intrinsicKey = intrinsics ? JSON.stringify(intrinsics) : "none";
+            return `${filename || "unknown"}::${intrinsicKey}`;
+        }
+
+        async function loadPLYFromData(arrayBuffer, filename, extrinsics, intrinsics) {
+            try {
+                const meshSignature = buildMeshSignature(filename, intrinsics);
+                const isNewMesh = meshSignature !== lastMeshSignature;
+                if (isNewMesh) {
+                    initialCameraData = null;
+                    baseFocalLength = null;
+                    baseFocalY = null;
+                    nativeImageWidth = null;
+                    nativeImageHeight = null;
+                    cachedSplatData = null;
+                    lastMeshSignature = meshSignature;
+                    
+                    // Reset to pure defaults
+                    currentScale = 11.0; 
+                    lastScaleValue = 11.0; // Sets baseline so updateGaussianScale doesn't duplicate
+                    if (scaleInput) scaleInput.value = 11;
+                    if (scaleDisplay) scaleDisplay.textContent = '11';
+                }
+
+                const hasIntrinsics = Array.isArray(intrinsics) && intrinsics.length >= 2;
+                if (!hasIntrinsics) {
+                    isResolutionLocked = false;
+                } else {
+                    const cx = intrinsics[0][2];
+                    const cy = intrinsics[1][2];
+                    nativeImageWidth = cx * 2;
+                    nativeImageHeight = cy * 2;
+                    isResolutionLocked = true;
+                    renderer.setSize(nativeImageWidth, nativeImageHeight);
+                    nativeAspect = nativeImageWidth / nativeImageHeight;
+                    updateCanvasDisplaySize();
+                }
+                
+                if (scene.objects && scene.objects.length > 0) {
+                    console.log('[GaussianViewer] Clearing', scene.objects.length, 'existing objects from scene');
+                    while (scene.objects.length > 0) {
+                        scene.removeObject(scene.objects[0]);
+                    }
+                }
+                currentSplat = null;
+
+                gaussianScaleCompensation = 1.0; 
+                if (intrinsics && Array.isArray(intrinsics) && intrinsics.length >= 2) {
+                    const cx = intrinsics[0][2];
+                    const imageWidth = cx * 2;
+                    const containerWidth = canvas.clientWidth || 512;
+                    gaussianScaleCompensation = computeScaleCompensation(imageWidth, containerWidth);
+                }
+
+                console.log('[GaussianViewer] Loading from data, size:', arrayBuffer.byteLength);
+
+                const blob = new Blob([arrayBuffer], { type: 'application/octet-stream' });
+                const blobUrl = URL.createObjectURL(blob);
+
+                await SPLAT.PLYLoader.LoadAsync(blobUrl, scene);
+
+                URL.revokeObjectURL(blobUrl);
+
+                if (scene.objects && scene.objects.length > 0) {
+                    currentSplat = scene.objects[scene.objects.length - 1];
+
+                    if (currentSplat.bounds) {
+                        const center = currentSplat.bounds.center();
+                        const size = currentSplat.bounds.size();
+                        console.log('[GaussianViewer] Scene bounds center:', center.x, center.y, center.z);
+                        console.log('[GaussianViewer] Scene bounds size:', size.x, size.y, size.z);
+                    }
+
+                    if (currentSplat.data && currentSplat.data.positions && currentSplat.data.rotations && currentSplat.data.colors && currentSplat.data.selection) {
+                        cachedSplatData = {
+                            positions: new Float32Array(currentSplat.data.positions),
+                            rotations: new Float32Array(currentSplat.data.rotations),
+                            colors: new Uint8Array(currentSplat.data.colors),
+                            selection: new Uint8Array(currentSplat.data.selection)
+                        };
+                    } else {
+                        cachedSplatData = null;
+                    }
+
+                    if (currentSplat.data && currentSplat.data.scales) {
+                        const scales = currentSplat.data.scales;
+                        const numGaussians = scales.length / 3;
+                        let minScale = Infinity, maxScale = -Infinity, sumScale = 0;
+
+                        originalScales = new Float32Array(scales.length);
+                        for (let i = 0; i < scales.length; i++) {
+                            originalScales[i] = scales[i] * gaussianScaleCompensation;
+                        }
+                        console.log('[GaussianViewer] Stored compensated scales (factor:', gaussianScaleCompensation.toFixed(2), 'x)');
+
+                        // NATIVELY APPLY DEFAULT SCALE TO PREVENT WEBGL BLANK SCREENS ON LOAD
+                        for (let i = 0; i < scales.length; i++) {
+                            scales[i] = originalScales[i] * currentScale; 
+                        }
+
+                        currentSplat.data.changed = true;
+
+                        for (let i = 0; i < scales.length; i++) {
+                            const s = scales[i];
+                            minScale = Math.min(minScale, s);
+                            maxScale = Math.max(maxScale, s);
+                            sumScale += s;
+                        }
+
+                        const avgScale = sumScale / scales.length;
+                        console.log('[GaussianViewer] === GAUSSIAN SCALE DEBUG (after compensation) ===');
+                        console.log('[GaussianViewer] Number of Gaussians:', numGaussians);
+                        console.log('[GaussianViewer] Compensated scale min:', minScale.toFixed(6));
+                        console.log('[GaussianViewer] Compensated scale max:', maxScale.toFixed(6));
+                        console.log('[GaussianViewer] Compensated scale avg:', avgScale.toFixed(6));
+                        console.log('[GaussianViewer] =================================================');
+                    } else {
+                        console.log('[GaussianViewer] No scales data found on splat object');
+                        originalScales = null;
+                    }
+
+                    // No need to dispatch a manual scale update since we injected it straight into the array above!
+                }
+
+                if ((extrinsics || intrinsics) && !initialCameraData) {
+                    setCameraFromExtrinsics(extrinsics, intrinsics, currentSplat);
+                    if (controls) controls.update();
+                } else if (!intrinsics && !extrinsics && !initialCameraData) {
+                    camera.data.fx = DEFAULT_FOCAL_LENGTH;
+                    camera.data.fy = DEFAULT_FOCAL_LENGTH;
+                    baseFocalLength = camera.data.fx;
+                    baseFocalY = camera.data.fy;
+                }
+
+                infoPanel.classList.remove('hidden');
+                infoContent.innerHTML = `<span style="color:#6cc;">Gaussian Splat Loaded</span><br><span style="color:#888;">${filename}</span>`;
+
+                updateBaseDistance();
+
+                window.parent.postMessage({
+                    type: 'MESH_LOADED',
+                    error: null,
+                    timestamp: Date.now()
+                }, '*');
+
+                console.log('[GaussianViewer] Loaded successfully');
+
+            } catch (err) {
+                console.error('[GaussianViewer] Load error:', err);
+                showError('Failed to load PLY: ' + err.message);
+
+                window.parent.postMessage({
+                    type: 'MESH_ERROR',
+                    error: err.message,
+                    timestamp: Date.now()
+                }, '*');
+            }
+        }
+
+        function resetCamera() {
+            if (camera && controls) {
+                if (initialCameraData) {
+                    const pos = initialCameraData.position;
+                    camera.position.x = pos.x;
+                    camera.position.y = pos.y;
+                    camera.position.z = pos.z;
+
+                    if (initialCameraData.fx) {
+                        camera.data.fx = initialCameraData.fx;
+                        baseFocalLength = initialCameraData.fx;
+                    }
+                    if (initialCameraData.fy) {
+                        camera.data.fy = initialCameraData.fy;
+                        baseFocalY = initialCameraData.fy;
+                    }
+
+                    if (initialCameraData.target) {
+                        controls.setCameraTarget(initialCameraData.target);
+                    }
+
+                    if (controls.resetRoll) {
+                        controls.resetRoll();
+                    }
+
+                    console.log('[GaussianViewer] Reset camera to position:', pos.x, pos.y, pos.z);
+                    console.log('[GaussianViewer] Reset camera target:', initialCameraData.target?.x, initialCameraData.target?.y, initialCameraData.target?.z);
+                } else {
+                    camera.position.x = 0;
+                    camera.position.y = 0;
+                    camera.position.z = 5;
+                    console.log('[GaussianViewer] Reset camera to default position (0, 0, 5)');
+                    if (controls.resetRoll) {
+                        controls.resetRoll();
+                    }
+                }
+
+                controls.update();
+                focalScaleInput.value = 1.0;
+                focalScaleValue.value = 1.0;
+                applyFocalScale(1.0);
+                
+                // If dynamic scale is ON, resync the base distance when resetting view
+                if (isDynamicScaleEnabled) {
+                    updateBaseDistance();
+                }
+                
+                scheduleFrameLayoutUpdate();
+            }
+        }
+
+        function getCanvasWithBlackBackground(sourceCanvas) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = sourceCanvas.width;
+            tempCanvas.height = sourceCanvas.height;
+            const ctx = tempCanvas.getContext('2d');
+            
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+            
+            ctx.drawImage(sourceCanvas, 0, 0);
+            
+            return tempCanvas;
+        }
+
+        async function takeScreenshot() {
+            if (!renderer || !renderer.canvas) return;
+
+            try {
+                const canvas = renderer.canvas;
+                const width = canvas.width;
+                const height = canvas.height;
+
+                if (animationId) cancelAnimationFrame(animationId);
+
+                if (scene && camera) {
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+
+                console.log('[GaussianViewer] Capturing screenshot via toDataURL:', width, 'x', height);
+
+                const finalCanvas = getCanvasWithBlackBackground(canvas);
+                const dataUrl = finalCanvas.toDataURL('image/png');
+
+                window.parent.postMessage({
+                    type: 'SCREENSHOT_V2',
+                    image: dataUrl,
+                    timestamp: Date.now()
+                }, '*');
+
+                resumeAnimationLoop();
+                console.log('[GaussianViewer] Screenshot captured successfully');
+            } catch (err) {
+                console.error('[GaussianViewer] Screenshot error:', err);
+                resumeAnimationLoop();
+            }
+        }
+
+        function updateOutputSettings(resolution, aspectRatio) {
+            if (resolution) {
+                outputSettings.resolution = resolution;
+            }
+            if (aspectRatio && aspectRatio !== "source") {
+                outputSettings.aspectRatio = aspectRatio;
+            }
+            updateCropFrame();
+        }
+
+        async function renderForRequest(requestId, resolution, aspectRatio) {
+            if (!renderer || !renderer.canvas) {
+                window.parent.postMessage({
+                    type: 'RENDER_ERROR',
+                    request_id: requestId,
+                    error: 'renderer not ready',
+                    source: 'preview_gaussian_v2',
+                    timestamp: Date.now()
+                }, '*');
+                return;
+            }
+
+            try {
+                updateOutputSettings(resolution, aspectRatio);
+
+                if (animationId) cancelAnimationFrame(animationId);
+
+                if (scene && camera) {
+                    controls.update();
+                    renderer.render(scene, camera);
+                }
+
+                const outputCanvas = createOutputCanvas() || getCanvasWithBlackBackground(renderer.canvas);
+                const dataUrl = outputCanvas.toDataURL('image/png');
+
+                window.parent.postMessage({
+                    type: 'RENDER_RESULT',
+                    request_id: requestId,
+                    image: dataUrl,
+                    source: 'preview_gaussian_v2',
+                    timestamp: Date.now()
+                }, '*');
+
+                resumeAnimationLoop();
+            } catch (err) {
+                window.parent.postMessage({
+                    type: 'RENDER_ERROR',
+                    request_id: requestId,
+                    error: err.message,
+                    source: 'preview_gaussian_v2',
+                    timestamp: Date.now()
+                }, '*');
+                resumeAnimationLoop();
+            }
+        }
+
+        function parseAspectRatio(value, fallbackWidth, fallbackHeight) {
+            if (!value || value === "source") {
+                return fallbackWidth > 0 && fallbackHeight > 0 ? fallbackWidth / fallbackHeight : 1.0;
+            }
+            if (value.includes(":")) {
+                const parts = value.split(":");
+                const w = parseFloat(parts[0]);
+                const h = parseFloat(parts[1]);
+                if (w > 0 && h > 0) {
+                    return w / h;
+                }
+            }
+            return 1.0;
+        }
+
+        function updateCropFrame() {
+            const wrapper = document.getElementById('canvasWrapper');
+            const wrapperRect = wrapper.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            const rect = {
+                width: canvasRect.width,
+                height: canvasRect.height,
+                left: canvasRect.left - wrapperRect.left,
+                top: canvasRect.top - wrapperRect.top
+            };
+            const aspect = parseAspectRatio(outputSettings.aspectRatio, rect.width, rect.height);
+            if (!aspect || rect.width <= 0 || rect.height <= 0) {
+                cropFrame.style.display = 'none';
+                return;
+            }
+            if (outputSettings.aspectRatio === "source") {
+                cropFrame.style.display = 'none';
+                return;
+            }
+
+            let frameWidth = rect.width;
+            let frameHeight = rect.width / aspect;
+            if (frameHeight > rect.height) {
+                frameHeight = rect.height;
+                frameWidth = rect.height * aspect;
+            }
+
+            const left = (rect.width - frameWidth) / 2;
+            const top = (rect.height - frameHeight) / 2;
+
+            cropFrame.style.display = 'block';
+            cropFrame.style.left = `${rect.left + left}px`;
+            cropFrame.style.top = `${rect.top + top}px`;
+            cropFrame.style.width = `${frameWidth}px`;
+            cropFrame.style.height = `${frameHeight}px`;
+        }
+
+        function updateCanvasDisplaySize() {
+            const container = document.getElementById('viewerContainer');
+            const rect = container.getBoundingClientRect();
+            const aspect = nativeAspect || ((renderer?.canvas?.width || 1) / (renderer?.canvas?.height || 1));
+            if (!aspect || rect.width <= 0 || rect.height <= 0) {
+                return;
+            }
+
+            let displayWidth = rect.width;
+            let displayHeight = rect.width / aspect;
+            if (displayHeight > rect.height) {
+                displayHeight = rect.height;
+                displayWidth = rect.height * aspect;
+            }
+
+            canvas.style.width = `${displayWidth}px`;
+            canvas.style.height = `${displayHeight}px`;
+
+            const overlayImage = document.getElementById('overlayImage');
+            if (overlayImage) {
+                overlayImage.style.width = canvas.style.width;
+                overlayImage.style.height = canvas.style.height;
+            }
+        }
+
+        function scheduleFrameLayoutUpdate() {
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    updateCanvasDisplaySize();
+                    updateCropFrame();
+                });
+            });
+        }
+
+        function getOutputDimensions() {
+            const canvas = renderer?.canvas;
+            const fallbackWidth = canvas?.width || 1;
+            const fallbackHeight = canvas?.height || 1;
+            const aspect = parseAspectRatio(outputSettings.aspectRatio, fallbackWidth, fallbackHeight);
+            const resolution = Math.max(1, parseInt(outputSettings.resolution, 10) || fallbackWidth);
+
+            let width;
+            let height;
+            if (aspect >= 1.0) {
+                width = resolution;
+                height = Math.max(1, Math.round(resolution / aspect));
+            } else {
+                height = resolution;
+                width = Math.max(1, Math.round(resolution * aspect));
+            }
+            return { width, height, aspect };
+        }
+
+        function createOutputCanvas() {
+            const canvas = renderer?.canvas;
+            if (!canvas) return null;
+
+            const sourceCanvas = getCanvasWithBlackBackground(canvas);
+            const { width: targetWidth, height: targetHeight, aspect: targetAspect } = getOutputDimensions();
+            const outputCanvas = document.createElement('canvas');
+            outputCanvas.width = targetWidth;
+            outputCanvas.height = targetHeight;
+
+            const ctx = outputCanvas.getContext('2d');
+            const sourceWidth = sourceCanvas.width;
+            const sourceHeight = sourceCanvas.height;
+            const sourceAspect = sourceWidth / sourceHeight;
+
+            let sx = 0;
+            let sy = 0;
+            let sWidth = sourceWidth;
+            let sHeight = sourceHeight;
+
+            if (Math.abs(sourceAspect - targetAspect) > 1e-4) {
+                if (sourceAspect > targetAspect) {
+                    sWidth = Math.round(sourceHeight * targetAspect);
+                    sx = Math.round((sourceWidth - sWidth) / 2);
+                } else {
+                    sHeight = Math.round(sourceWidth / targetAspect);
+                    sy = Math.round((sourceHeight - sHeight) / 2);
+                }
+            }
+
+            ctx.drawImage(sourceCanvas, sx, sy, sWidth, sHeight, 0, 0, targetWidth, targetHeight);
+            return outputCanvas;
+        }
+
+        function getCameraTarget() {
+            if (!controls) return null;
+            if (typeof controls.getCameraTarget === 'function') {
+                return controls.getCameraTarget();
+            }
+            return lastCameraTarget || controls.target || controls._target || controls.cameraTarget || null;
+        }
+
+        function toSplatVector3(v, fallback = null) {
+            if (!v || typeof v !== 'object') return fallback;
+            const x = Number(v.x);
+            const y = Number(v.y);
+            const z = Number(v.z);
+            if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+                return fallback;
+            }
+            return new SPLAT.Vector3(x, y, z);
+        }
+
+        function showPresetStatus(text, isError = false) {
+            if (!presetStatusEl) return;
+            presetStatusEl.textContent = text || '';
+            presetStatusEl.style.color = isError ? '#ff8a8a' : '#9ad';
+            if (showPresetStatus._timer) {
+                clearTimeout(showPresetStatus._timer);
+            }
+            if (text) {
+                showPresetStatus._timer = setTimeout(() => {
+                    presetStatusEl.textContent = '';
+                }, 2200);
+            }
+        }
+
+        function loadPresetStore() {
+            try {
+                const raw = localStorage.getItem(CAMERA_PRESET_STORAGE_KEY);
+                if (!raw) {
+                    return { version: 1, global: [], by_mesh: {} };
+                }
+                const parsed = JSON.parse(raw);
+                return {
+                    version: 1,
+                    global: Array.isArray(parsed.global) ? parsed.global : [],
+                    by_mesh: parsed.by_mesh && typeof parsed.by_mesh === 'object' ? parsed.by_mesh : {}
+                };
+            } catch (err) {
+                console.warn('[GaussianViewer] Failed to parse preset store:', err);
+                return { version: 1, global: [], by_mesh: {} };
+            }
+        }
+
+        function savePresetStore(store) {
+            localStorage.setItem(CAMERA_PRESET_STORAGE_KEY, JSON.stringify(store));
+        }
+
+        function getPresetBucket(store, scope, createIfMissing = false) {
+            if (scope === 'mesh') {
+                if (!currentMeshKey) return null;
+                if (!Array.isArray(store.by_mesh[currentMeshKey])) {
+                    if (!createIfMissing) return null;
+                    store.by_mesh[currentMeshKey] = [];
+                }
+                return store.by_mesh[currentMeshKey];
+            }
+            if (!Array.isArray(store.global)) {
+                store.global = [];
+            }
+            return store.global;
+        }
+
+        function getCurrentCameraStateSnapshot() {
+            if (!camera || !controls) return null;
+            const target = getCameraTarget();
+            const canvasRef = renderer?.canvas;
+            return {
+                position: {
+                    x: camera.position.x,
+                    y: camera.position.y,
+                    z: camera.position.z
+                },
+                target: target ? { x: target.x, y: target.y, z: target.z } : null,
+                fx: camera.data?.fx || null,
+                fy: camera.data?.fy || null,
+                roll: Number.isFinite(controls.currentRoll) ? controls.currentRoll : 0,
+                image_width: nativeImageWidth || canvasRef?.width || null,
+                image_height: nativeImageHeight || canvasRef?.height || null,
+                scale: currentScale || 11.0,
+                scale_compensation: gaussianScaleCompensation || null
+            };
+        }
+
+        function refreshPresetOptions(preferredValue = null) {
+            if (!presetSelectEl) return;
+            const store = loadPresetStore();
+            const globalPresets = Array.isArray(store.global) ? store.global : [];
+            const meshPresets = currentMeshKey && Array.isArray(store.by_mesh[currentMeshKey])
+                ? store.by_mesh[currentMeshKey]
+                : [];
+
+            presetOptionMap = new Map();
+            presetSelectEl.innerHTML = '';
+
+            const empty = document.createElement('option');
+            empty.value = '';
+            empty.textContent = '(No Preset)';
+            presetSelectEl.appendChild(empty);
+
+            let i = 1;
+            for (const p of globalPresets) {
+                const value = `g:${i++}`;
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = `[Global] ${p.name || 'unnamed'}`;
+                presetOptionMap.set(value, { scope: 'global', preset: p });
+                presetSelectEl.appendChild(opt);
+            }
+            for (const p of meshPresets) {
+                const value = `m:${i++}`;
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = `[Mesh] ${p.name || 'unnamed'}`;
+                presetOptionMap.set(value, { scope: 'mesh', preset: p });
+                presetSelectEl.appendChild(opt);
+            }
+
+            if (preferredValue && presetOptionMap.has(preferredValue)) {
+                presetSelectEl.value = preferredValue;
+            } else {
+                presetSelectEl.value = '';
+            }
+        }
+
+        async function saveCurrentPreset() {
+            const presetName = (presetNameEl?.value || '').trim();
+            const scope = presetScopeEl?.value || 'global';
+            if (!presetName) {
+                showPresetStatus('Please input preset name', true);
+                return;
+            }
+            if (scope === 'mesh' && !currentMeshKey) {
+                showPresetStatus('Load mesh first for mesh preset', true);
+                return;
+            }
+
+            const cameraState = getCurrentCameraStateSnapshot();
+            if (!cameraState) {
+                showPresetStatus('Camera not ready', true);
+                return;
+            }
+
+            const store = loadPresetStore();
+            const bucket = getPresetBucket(store, scope, true);
+            if (!bucket) {
+                showPresetStatus('Preset bucket unavailable', true);
+                return;
+            }
+
+            const existingIndex = bucket.findIndex(p => p?.name === presetName);
+            const now = Date.now();
+            const preset = {
+                name: presetName,
+                scope,
+                meshKey: scope === 'mesh' ? currentMeshKey : null,
+                camera_state: cameraState,
+                created_at: existingIndex >= 0 ? (bucket[existingIndex].created_at || now) : now,
+                updated_at: now
+            };
+
+            if (existingIndex >= 0) {
+                const ok = await requestPresetConfirm({
+                    title: 'Overwrite Preset',
+                    message: `Preset "${presetName}" already exists. Overwrite it?`,
+                    confirmText: 'Overwrite',
+                    cancelText: 'Cancel',
+                    level: 'warning'
+                });
+                if (!ok) {
+                    showPresetStatus('Save cancelled');
+                    return;
+                }
+                bucket[existingIndex] = preset;
+            } else {
+                bucket.push(preset);
+            }
+
+            savePresetStore(store);
+            refreshPresetOptions();
+            const selected = [...presetOptionMap.entries()].find(([, v]) => v.preset.name === presetName && v.scope === scope);
+            if (selected) {
+                presetSelectEl.value = selected[0];
+            }
+            showPresetStatus('Preset saved');
+        }
+
+        function applySelectedPreset() {
+            const selectedKey = presetSelectEl?.value;
+            if (!selectedKey || !presetOptionMap.has(selectedKey)) {
+                showPresetStatus('Select a preset first', true);
+                return;
+            }
+            const selected = presetOptionMap.get(selectedKey);
+            const cameraState = selected?.preset?.camera_state;
+            if (!cameraState) {
+                showPresetStatus('Invalid preset camera state', true);
+                return;
+            }
+            applyCameraState(JSON.parse(JSON.stringify(cameraState)));
+            if (presetNameEl) {
+                presetNameEl.value = selected.preset.name || '';
+            }
+            showPresetStatus('Preset applied');
+        }
+
+        async function deleteSelectedPreset() {
+            const selectedKey = presetSelectEl?.value;
+            if (!selectedKey || !presetOptionMap.has(selectedKey)) {
+                showPresetStatus('Select a preset first', true);
+                return;
+            }
+            const selected = presetOptionMap.get(selectedKey);
+            const presetName = selected?.preset?.name || 'unnamed';
+            const ok = await requestPresetConfirm({
+                title: 'Delete Preset',
+                message: `Delete preset "${presetName}"? This action cannot be undone.`,
+                confirmText: 'Delete',
+                cancelText: 'Cancel',
+                level: 'danger'
+            });
+            if (!ok) return;
+
+            const store = loadPresetStore();
+            const bucket = getPresetBucket(store, selected.scope, false);
+            if (!bucket) {
+                showPresetStatus('Preset bucket missing', true);
+                return;
+            }
+
+            const idx = bucket.findIndex(p => p?.name === presetName);
+            if (idx < 0) {
+                showPresetStatus('Preset not found', true);
+                return;
+            }
+            bucket.splice(idx, 1);
+            savePresetStore(store);
+            refreshPresetOptions();
+            showPresetStatus('Preset deleted');
+        }
+
+        function applyCameraState(cameraState) {
+            if (!camera || !controls || !cameraState) {
+                console.warn('[GaussianViewer] applyCameraState skipped - missing camera/controls/state');
+                return;
+            }
+            console.log('[GaussianViewer] Applying camera state:', cameraState);
+
+            const position = toSplatVector3(cameraState.position, null);
+            const target = toSplatVector3(cameraState.target, null);
+            const fx = cameraState.fx;
+            const fy = cameraState.fy;
+            const roll = Number(cameraState.roll);
+            const scale = cameraState.scale;
+
+            if (fx) {
+                camera.data.fx = fx;
+                baseFocalLength = fx;
+            }
+            if (fy) {
+                camera.data.fy = fy;
+                baseFocalY = fy;
+            }
+
+            if (position) {
+                camera.position.x = position.x;
+                camera.position.y = position.y;
+                camera.position.z = position.z;
+            }
+
+            if (target && controls.setCameraTarget) {
+                controls.setCameraTarget(target);
+            }
+
+            if (Number.isFinite(roll)) {
+                controls.currentRoll = roll;
+                controls.targetRoll = roll;
+            }
+
+            if (dynamicScaleToggle && dynamicScaleToggle.checked) {
+                dynamicScaleToggle.checked = false;
+                isDynamicScaleEnabled = false;
+            }
+
+            if (scale) {
+                updateGaussianScale(scale);
+            }
+
+            if (focalScaleInput) focalScaleInput.value = 1.0;
+            if (focalScaleValue) focalScaleValue.value = 1.0;
+
+            controls.update();
+            scheduleFrameLayoutUpdate();
+            console.log('[GaussianViewer] applyCameraState complete');
+        }
+
+        function setCameraParams() {
+            console.log('[GaussianViewer] ===== SET CAMERA PARAMS STARTED =====');
+            
+            if (!renderer || !camera || !controls) {
+                console.warn('[GaussianViewer] WARNING: Cannot set camera params - required objects missing');
+                return;
+            }
+
+            const target = getCameraTarget();
+            const canvas = renderer.canvas;
+            const imageWidth = nativeImageWidth || canvas?.width || null;
+            const imageHeight = nativeImageHeight || canvas?.height || null;
+
+            const cameraState = {
+                position: {
+                    x: camera.position.x,
+                    y: camera.position.y,
+                    z: camera.position.z
+                },
+                target: target ? { x: target.x, y: target.y, z: target.z } : null,
+                fx: camera.data?.fx || null,
+                fy: camera.data?.fy || null,
+                roll: Number.isFinite(controls.currentRoll) ? controls.currentRoll : 0,
+                image_width: imageWidth,
+                image_height: imageHeight,
+                scale: currentScale || 11.0,
+                scale_compensation: gaussianScaleCompensation || null
+            };
+
+            window.parent.postMessage({
+                type: 'SET_CAMERA_PARAMS',
+                camera_state: cameraState,
+                timestamp: Date.now()
+            }, '*');
+
+            scheduleFrameLayoutUpdate();
+        }
+
+        // --- NEW REAL-TIME GAUSSIAN SCALE CONTROL ---
+        const scaleInput = document.getElementById('gaussianScaleValue');
+        const scaleDisplay = document.getElementById('gaussianScaleDisplay');
+        const autoScaleBtn = document.getElementById('autoScaleBtn');
+        let currentScale = 11.0; 
+        let scaleUpdatePending = false;
+        let lastScaleValue = -1; // Force initialize on load
+
+        function updateGaussianScale(newScale) {
+            newScale = Math.max(1, Math.min(30, Math.round(parseFloat(newScale) || 11)));
+            
+            // Skip redundant updates to save heavy array operations
+            if (newScale === lastScaleValue) return; 
+            
+            currentScale = newScale;
+            lastScaleValue = newScale;
+
+            // Update inputs visually
+            if (scaleInput) scaleInput.value = newScale;
+            if (scaleDisplay) scaleDisplay.textContent = newScale;
+
+            if (currentSplat && currentSplat.data && currentSplat.data.scales && originalScales) {
+                const data = currentSplat.data;
+                let scales = data.scales;
+                const detached = data.detached || !scales || scales.buffer.byteLength === 0;
+
+                if (detached) {
+                    if (!cachedSplatData) return;
+                    const newScales = new Float32Array(originalScales.length);
+                    for (let i = 0; i < newScales.length; i++) {
+                        newScales[i] = originalScales[i] * newScale;
+                    }
+                    const positions = new Float32Array(cachedSplatData.positions);
+                    const rotations = new Float32Array(cachedSplatData.rotations);
+                    const colors = new Uint8Array(cachedSplatData.colors);
+                    const selection = new Uint8Array(cachedSplatData.selection);
+                    data.reattach(
+                        positions.buffer,
+                        rotations.buffer,
+                        newScales.buffer,
+                        colors.buffer,
+                        selection.buffer
+                    );
+                    scales = data.scales;
+                } else {
+                    for (let i = 0; i < scales.length; i++) {
+                        scales[i] = originalScales[i] * newScale;
+                    }
+                }
+
+                data.changed = true;
+                data.detached = false;
+
+                const renderData = renderer._renderData || renderer.renderData;
+                if (renderData && renderData.markDirty) {
+                    renderData.markDirty(currentSplat);
+                    renderData.dataChanged = true;
+                }
+
+                if (currentSplat.dispatchEvent && currentSplat._changeEvent) {
+                    currentSplat.dispatchEvent(currentSplat._changeEvent);
+                }
+
+                if (scene && scene.removeObject && scene.addObject) {
+                    if (!scaleUpdatePending) {
+                        scaleUpdatePending = true;
+                        const splatToRefresh = currentSplat;
+                        setTimeout(() => {
+                            scaleUpdatePending = false;
+                            if (splatToRefresh === currentSplat) {
+                                scene.removeObject(splatToRefresh);
+                                scene.addObject(splatToRefresh);
+                            }
+                        }, 150); 
+                    }
+                }
+            }
+        }
+
+        const dynamicScaleToggle = document.getElementById('dynamicScaleToggle');
+        if (dynamicScaleToggle) {
+            dynamicScaleToggle.addEventListener('change', (e) => {
+                isDynamicScaleEnabled = e.target.checked;
+                if (isDynamicScaleEnabled) {
+                    updateBaseDistance();
+                }
+            });
+        }
+
+        // Bind Real-Time Dragging (Manually touching the slider overrides Dynamic mode)
+        if (scaleInput) {
+            scaleInput.addEventListener('input', (e) => {
+                if (dynamicScaleToggle && dynamicScaleToggle.checked) {
+                    dynamicScaleToggle.checked = false;
+                    isDynamicScaleEnabled = false;
+                }
+                updateGaussianScale(e.target.value);
+            });
+        }
+
+        // Auto Button (Restores Auto-Scaling Defaults AND re-engages Dynamic scale)
+        const setAutoScale = () => {
+            if (dynamicScaleToggle) {
+                dynamicScaleToggle.checked = true;
+                isDynamicScaleEnabled = true;
+                updateBaseDistance();
+            }
+            updateGaussianScale(11);
+        };
+        if (autoScaleBtn) autoScaleBtn.addEventListener('click', setAutoScale);
+        // ---------------------------------------------
+
+
+        const focalScaleInput = document.getElementById('focalScale');
+        const focalScaleValue = document.getElementById('focalScaleValue');
+
+        function applyFocalScale(value) {
+            const scale = Math.max(0.2, Math.min(3.0, parseFloat(value) || 1.0));
+            focalScaleInput.value = scale;
+            focalScaleValue.value = scale;
+            
+            const baseFx = baseFocalLength || camera?.data?.fx || DEFAULT_FOCAL_LENGTH;
+            const baseFy = baseFocalY || camera?.data?.fy || DEFAULT_FOCAL_LENGTH;
+            
+            if (camera?.data) {
+                camera.data.fx = baseFx * scale;
+                camera.data.fy = baseFy * scale;
+            } 
+        }
+
+        focalScaleInput.addEventListener('input', (e) => applyFocalScale(e.target.value));
+        focalScaleValue.addEventListener('change', (e) => applyFocalScale(e.target.value));
+
+        const ratioSelect = document.getElementById('ratioSelect');
+        const presetScopeEl = document.getElementById('presetScope');
+        const presetNameEl = document.getElementById('presetName');
+        const presetSelectEl = document.getElementById('presetSelect');
+        const savePresetBtn = document.getElementById('savePreset');
+        const applyPresetBtn = document.getElementById('applyPreset');
+        const deletePresetBtn = document.getElementById('deletePreset');
+        const presetStatusEl = document.getElementById('presetStatus');
+
+        function setAspectRatio(value) {
+            outputSettings.aspectRatio = value || "source";
+            if (ratioSelect) {
+                ratioSelect.value = outputSettings.aspectRatio;
+            }
+            scheduleFrameLayoutUpdate();
+        }
+
+        function updateCameraInfoDisplay() {
+            const cameraInfoContent = document.getElementById('cameraInfoContent');
+            if (!cameraInfoContent || !camera || !controls) return;
+
+            const pos = camera.position;
+            const toDeg = (rad) => (rad * 180 / Math.PI).toFixed(2);
+
+            let pitch = 0, yaw = 0, roll = 0;
+            if (controls.currentAlpha !== undefined) {
+                pitch = -controls.currentBeta;
+                yaw = -controls.currentAlpha;
+                roll = controls.currentRoll;
+            }
+
+            cameraInfoContent.innerHTML = `
+                <div style="color: #6cc; margin-bottom: 2px; font-weight: bold;">Camera State</div>
+                <div style="display: grid; grid-template-columns: auto 1fr; gap: 2px 8px;">
+                    <span style="color: #888;">Pos:</span>
+                    <span>${pos.x.toFixed(2)}, ${pos.y.toFixed(2)}, ${pos.z.toFixed(2)}</span>
+                    <span style="color: #888;">Rot:</span>
+                    <span>P:${toDeg(pitch)}° Y:${toDeg(yaw)}° R:${toDeg(roll)}°</span>
+                </div>
+            `;
+        }
+
+        if (ratioSelect) {
+            ratioSelect.addEventListener('change', (e) => {
+                setAspectRatio(e.target.value);
+            });
+        }
+
+        if (savePresetBtn) savePresetBtn.addEventListener('click', saveCurrentPreset);
+        if (applyPresetBtn) applyPresetBtn.addEventListener('click', applySelectedPreset);
+        if (deletePresetBtn) deletePresetBtn.addEventListener('click', deleteSelectedPreset);
+        if (presetSelectEl) {
+            presetSelectEl.addEventListener('change', () => {
+                const selected = presetOptionMap.get(presetSelectEl.value);
+                if (selected && presetNameEl) {
+                    presetNameEl.value = selected.preset.name || '';
+                }
+            });
+        }
+
+        refreshPresetOptions();
+
+        document.getElementById('resetCamera').addEventListener('click', resetCamera);
+        document.getElementById('setCamera').addEventListener('click', setCameraParams);
+
+        const helpPanel = document.getElementById('helpPanel');
+        const toggleHelpBtn = document.getElementById('toggleHelp');
+        const closeHelpBtn = document.getElementById('closeHelp');
+
+        if (toggleHelpBtn && helpPanel) toggleHelpBtn.addEventListener('click', () => helpPanel.classList.toggle('hidden'));
+        if (closeHelpBtn && helpPanel) closeHelpBtn.addEventListener('click', () => helpPanel.classList.add('hidden'));
+
+        const overlayAlphaInput = document.getElementById('overlayAlpha');
+        const overlayAlphaValue = document.getElementById('overlayAlphaValue');
+
+        function applyOverlayAlpha(value) {
+            const alpha = Math.max(0, Math.min(1, parseFloat(value) || 0));
+            if (overlayAlphaInput) overlayAlphaInput.value = alpha;
+            if (overlayAlphaValue) overlayAlphaValue.value = alpha;
+
+            const overlayImage = document.getElementById('overlayImage');
+            if (overlayImage) {
+                overlayImage.style.opacity = alpha;
+            }
+        }
+
+        if (overlayAlphaInput) overlayAlphaInput.addEventListener('input', (e) => applyOverlayAlpha(e.target.value));
+        if (overlayAlphaValue) overlayAlphaValue.addEventListener('change', (e) => applyOverlayAlpha(e.target.value));
+
+        window.addEventListener('message', async (event) => {
+            const { type, data, filename, extrinsics, intrinsics, overlay_image } = event.data;
+
+            if (type === 'LOAD_MESH_DATA' && data) {
+                currentMeshKey = filename || null;
+                refreshPresetOptions();
+
+                const overlayImage = document.getElementById('overlayImage');
+                const overlayControl = document.getElementById('overlayControl');
+                if (overlay_image && overlayImage) {
+                    overlayImage.src = "/view?filename=" + encodeURIComponent(overlay_image) + "&type=output";
+                    overlayImage.style.display = "block";
+                    if (overlayControl) overlayControl.style.display = "flex";
+                } else if (overlayImage) {
+                    overlayImage.style.display = "none";
+                    if (overlayControl) overlayControl.style.display = "none";
+                }
+
+                await loadPLYFromData(data, filename || 'gaussian.ply', extrinsics, intrinsics);
+                applyFocalScale(focalScaleInput.value);
+                scheduleFrameLayoutUpdate();
+                
+                // ADDED: Force Auto Scale on every new mesh load to ensure UI and renderer are synced
+                setTimeout(() => {
+                    setAutoScale();
+                }, 500);
+
+            } else if (type === 'LOAD_MESH_DATA' && !data) {
+                console.warn('[GaussianViewer] LOAD_MESH_DATA missing data buffer');
+            } else if (type === 'APPLY_CAMERA_STATE' && event.data?.camera_state) {
+                applyCameraState(event.data.camera_state);
+            } else if (type === 'RENDER_REQUEST' && event.data?.request_id) {
+                const requestId = event.data.request_id;
+                const resolution = event.data.output_resolution;
+                const aspectRatio = event.data.output_aspect_ratio;
+                renderForRequest(requestId, resolution, aspectRatio);
+            } else if (type === 'OUTPUT_SETTINGS') {
+                const resolution = event.data?.output_resolution;
+                const aspectRatio = event.data?.output_aspect_ratio;
+                updateOutputSettings(resolution, aspectRatio);
+            } else if (type === 'PRESET_CONFIRM_RESULT' && event.data?.request_id) {
+                const resolver = pendingPresetConfirmResolvers.get(event.data.request_id);
+                if (resolver) {
+                    pendingPresetConfirmResolvers.delete(event.data.request_id);
+                    resolver(event.data.confirmed === true);
+                }
+            }
+        });
+
+        // Initialize on load
+        initViewer();
+
+        const updateUIScale = () => {
+            const width = window.innerWidth;
+            const scale = Math.max(0.7, Math.min(1.8, 1.0 + (width - 512) / 1000));
+            document.documentElement.style.setProperty('--ui-scale', scale);
+        };
+        new ResizeObserver(updateUIScale).observe(document.body);
+        updateUIScale();
+
+        console.log('[GaussianViewer] Ready - waiting for LOAD_MESH message');
+    </script>
+</body>
+</html>

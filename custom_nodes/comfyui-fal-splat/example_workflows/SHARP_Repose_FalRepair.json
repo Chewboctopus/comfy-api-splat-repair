@@ -1,0 +1,417 @@
+{
+  "id": "fal-splat-repair-v2",
+  "revision": 2,
+  "last_node_id": 18,
+  "last_link_id": 30,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "LoadImage",
+      "pos": [-800, -300],
+      "size": [300, 320],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "IMAGE", "type": "IMAGE", "links": [1, 8, 20, 25], "slot_index": 0},
+        {"name": "MASK", "type": "MASK", "links": [], "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "LoadImage"},
+      "widgets_values": ["example.png", "image"],
+      "_meta": {"title": "Load Source Photo"}
+    },
+    {
+      "id": 2,
+      "type": "LoadSharpModel",
+      "pos": [-800, -650],
+      "size": [270, 106],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {"name": "model", "type": "SHARP_MODEL", "links": [2], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "LoadSharpModel"},
+      "widgets_values": ["auto", ""],
+      "_meta": {"title": "Load SHARP Model (Local GPU)"}
+    },
+    {
+      "id": 3,
+      "type": "SharpPredict",
+      "pos": [-400, -600],
+      "size": [300, 150],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {"name": "model", "type": "SHARP_MODEL", "link": 2},
+        {"name": "image", "type": "IMAGE", "link": 1},
+        {"name": "extrinsics", "type": "EXTRINSICS", "link": null, "shape": 7},
+        {"name": "intrinsics", "type": "INTRINSICS", "link": null, "shape": 7}
+      ],
+      "outputs": [
+        {"name": "ply_path", "type": "STRING", "links": [3], "slot_index": 0},
+        {"name": "extrinsics", "type": "EXTRINSICS", "links": [4, 30], "slot_index": 1},
+        {"name": "intrinsics", "type": "INTRINSICS", "links": [5], "slot_index": 2}
+      ],
+      "properties": {"Node name for S&R": "SharpPredict"},
+      "widgets_values": [30.0, "sharp"],
+      "_meta": {"title": "SHARP Predict → Gaussian Splat (Local GPU)"}
+    },
+    {
+      "id": 4,
+      "type": "GaussianViewerLift",
+      "pos": [0, -700],
+      "size": [1300, 800],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {"name": "ply_path", "type": "STRING", "link": 3},
+        {"name": "extrinsics", "type": "EXTRINSICS", "link": 4, "shape": 7},
+        {"name": "intrinsics", "type": "INTRINSICS", "link": 5, "shape": 7},
+        {"name": "image", "type": "IMAGE", "link": null, "shape": 7}
+      ],
+      "outputs": [
+        {"name": "image", "type": "IMAGE", "links": [6, 9, 14, 22], "slot_index": 0},
+        {"name": "extrinsics", "type": "EXTRINSICS", "links": [29], "slot_index": 1},
+        {"name": "intrinsics", "type": "INTRINSICS", "links": null, "slot_index": 2}
+      ],
+      "properties": {"Node name for S&R": "GaussianViewerLift"},
+      "widgets_values": [""],
+      "_meta": {"title": "GaussianViewer Lift — Repose Camera Here"}
+    },
+    {
+      "id": 5,
+      "type": "SplatArtifactMask_splat",
+      "pos": [1400, -600],
+      "size": [300, 200],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {"name": "original_image", "type": "IMAGE", "link": 8},
+        {"name": "reposed_image", "type": "IMAGE", "link": 6}
+      ],
+      "outputs": [
+        {"name": "artifact_mask", "type": "MASK", "links": [17], "slot_index": 0},
+        {"name": "mask_preview", "type": "IMAGE", "links": [11], "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "SplatArtifactMask_splat"},
+      "widgets_values": [0.12, 8, 12, false],
+      "_meta": {"title": "Detect Splat Artifacts"}
+    },
+    {
+      "id": 6,
+      "type": "SplatDifferenceDebug_splat",
+      "pos": [1400, -320],
+      "size": [300, 130],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {"name": "original_image", "type": "IMAGE", "link": 20},
+        {"name": "reposed_image", "type": "IMAGE", "link": 9}
+      ],
+      "outputs": [
+        {"name": "diff_image", "type": "IMAGE", "links": [12], "slot_index": 0},
+        {"name": "overlay", "type": "IMAGE", "links": [13], "slot_index": 1},
+        {"name": "stats_text", "type": "STRING", "links": null, "slot_index": 2}
+      ],
+      "properties": {"Node name for S&R": "SplatDifferenceDebug_splat"},
+      "widgets_values": [3.0],
+      "_meta": {"title": "Difference Debug (threshold tuning)"}
+    },
+    {
+      "id": 7,
+      "type": "PreviewImage",
+      "pos": [1780, -600],
+      "size": [300, 260],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 11}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "_meta": {"title": "Artifact Mask Preview"}
+    },
+    {
+      "id": 8,
+      "type": "PreviewImage",
+      "pos": [1780, -320],
+      "size": [300, 260],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 12}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "_meta": {"title": "Diff Debug Preview"}
+    },
+    {
+      "id": 9,
+      "type": "FalLoRAFromURL_splat",
+      "pos": [1400, 80],
+      "size": [320, 100],
+      "flags": {},
+      "order": 8,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {"name": "lora_url", "type": "STRING", "links": null, "slot_index": 0},
+        {"name": "scale", "type": "FLOAT", "links": null, "slot_index": 1},
+        {"name": "source_type", "type": "STRING", "links": null, "slot_index": 2}
+      ],
+      "properties": {"Node name for S&R": "FalLoRAFromURL_splat"},
+      "widgets_values": ["https://huggingface.co/cyrildiagne/flux2-klein9b-lora-mlsharp-3d-repair/resolve/main/flux2-klein9b-lora-mlsharp-3d-repair.safetensors", 1.0],
+      "_meta": {"title": "ML Sharp 3D Repair LoRA (muted — LoRA URL now built into repair node)"}
+    },
+    {
+      "id": 10,
+      "type": "FluxSplatRepair_splat",
+      "pos": [1820, 60],
+      "size": [400, 580],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {"name": "original_image", "type": "IMAGE", "link": 25},
+        {"name": "reposed_image", "type": "IMAGE", "link": 14},
+        {"name": "reposed_extrinsics", "type": "EXTRINSICS", "link": 29},
+        {"name": "original_extrinsics", "type": "EXTRINSICS", "link": 30}
+      ],
+      "outputs": [
+        {"name": "repaired_image", "type": "IMAGE", "links": [26, 27], "slot_index": 0}
+      ],
+      "properties": {"Node name for S&R": "FluxSplatRepair_splat"},
+      "widgets_values": [
+        "Referring to the scene in image 1, restore the perspective of the scene in image 2. Repair the perspective and missing areas.",
+        0.0, 0.0, 0.0,
+        0.0, 0.0, 0.0,
+        "fal-ai/flux-2/klein/9b/base/edit/lora",
+        "",
+        "https://huggingface.co/cyrildiagne/flux2-klein9b-lora-mlsharp-3d-repair/resolve/main/flux2-klein9b-lora-mlsharp-3d-repair.safetensors",
+        1.0,
+        28, 3.5, -1
+      ],
+      "_meta": {"title": "Flux Klein Splat Repair (fal.ai + mlsharp LoRA)"}
+    },
+    {
+      "id": 11,
+      "type": "FluxSplatInpaint_splat",
+      "pos": [1820, 650],
+      "size": [380, 320],
+      "flags": {"collapsed": false},
+      "order": 10,
+      "mode": 4,
+      "inputs": [
+        {"name": "reposed_image", "type": "IMAGE", "link": 22},
+        {"name": "original_image", "type": "IMAGE", "link": null, "shape": 7},
+        {"name": "artifact_mask", "type": "MASK", "link": 17, "shape": 7}
+      ],
+      "outputs": [
+        {"name": "repaired_image", "type": "IMAGE", "links": null, "slot_index": 0},
+        {"name": "mask_used", "type": "MASK", "links": null, "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "FluxSplatInpaint_splat"},
+      "widgets_values": [
+        "photorealistic, clean, sharp, natural photograph, no artifacts",
+        0.12, 20, 28, 30.0, -1, "png"
+      ],
+      "_meta": {"title": "ALT: Flux Inpaint Repair (muted — enable to use)"}
+    },
+    {
+      "id": 12,
+      "type": "QwenSplatRepair_splat",
+      "pos": [2300, -600],
+      "size": [350, 280],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {"name": "reposed_image", "type": "IMAGE", "link": 6},
+        {"name": "original_image", "type": "IMAGE", "link": 28, "shape": 7}
+      ],
+      "outputs": [
+        {"name": "repaired_image", "type": "IMAGE", "links": null, "slot_index": 0},
+        {"name": "artifact_analysis", "type": "STRING", "links": null, "slot_index": 1},
+        {"name": "suggested_repair_prompt", "type": "STRING", "links": null, "slot_index": 2}
+      ],
+      "properties": {"Node name for S&R": "QwenSplatRepair_splat"},
+      "widgets_values": ["analyse_only", "", ""],
+      "_meta": {"title": "Qwen Artifact Analysis (optional)"}
+    },
+    {
+      "id": 13,
+      "type": "SplatRepairBlend_splat",
+      "pos": [2300, 200],
+      "size": [320, 200],
+      "flags": {},
+      "order": 12,
+      "mode": 4,
+      "inputs": [
+        {"name": "original_image", "type": "IMAGE", "link": null},
+        {"name": "repaired_image", "type": "IMAGE", "link": null},
+        {"name": "artifact_mask", "type": "MASK", "link": null}
+      ],
+      "outputs": [
+        {"name": "blended_image", "type": "IMAGE", "links": null, "slot_index": 0},
+        {"name": "blend_mask", "type": "MASK", "links": null, "slot_index": 1}
+      ],
+      "properties": {"Node name for S&R": "SplatRepairBlend_splat"},
+      "widgets_values": [1.0, 4, false],
+      "_meta": {"title": "Final Blend (muted — LoRA does full-frame repair)"}
+    },
+    {
+      "id": 14,
+      "type": "SaveImage",
+      "pos": [2300, 100],
+      "size": [350, 300],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 26}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "SaveImage"},
+      "widgets_values": ["fal-splat-repaired"],
+      "_meta": {"title": "Save Repaired Image"}
+    },
+    {
+      "id": 15,
+      "type": "PreviewImage",
+      "pos": [2300, 460],
+      "size": [300, 260],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {"name": "images", "type": "IMAGE", "link": 27}
+      ],
+      "outputs": [],
+      "properties": {"Node name for S&R": "PreviewImage"},
+      "_meta": {"title": "Repair Preview"}
+    },
+    {
+      "id": 16,
+      "type": "Note",
+      "pos": [-800, -780],
+      "size": [600, 80],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {"text": ""},
+      "widgets_values": [
+        "SHARP → Repose → Fal Repair Workflow v2\n\n1. Load your photo  2. SHARP runs locally → creates Gaussian splat  3. Click 'Set Camera' in the viewer after reposing  4. Queue prompt → fal.ai repairs artifacts with Flux Klein + mlsharp LoRA"
+      ],
+      "_meta": {"title": "Workflow Guide"},
+      "color": "#233",
+      "bgcolor": "#355"
+    },
+    {
+      "id": 17,
+      "type": "Note",
+      "pos": [1400, 250],
+      "size": [350, 100],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {"text": ""},
+      "widgets_values": [
+        "The mlsharp repair LoRA sends BOTH images to Flux Klein:\n• Image 1 = original photo (reference)\n• Image 2 = reposed splat render (to repair)\n\nThe LoRA fills black holes + removes floaters automatically.\nNo masking or blending needed!"
+      ],
+      "_meta": {"title": "How It Works"},
+      "color": "#332",
+      "bgcolor": "#553"
+    },
+    {
+      "id": 18,
+      "type": "Note",
+      "pos": [1820, 1020],
+      "size": [380, 80],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {"text": ""},
+      "widgets_values": [
+        "The FluxSplatInpaint node (above, muted) is an alternative path.\nEnable it instead of FluxSplatRepair for hard-mask inpainting\nvia Flux Pro Fill — better for large solid artifact regions."
+      ],
+      "_meta": {"title": "Alt Inpaint Note"},
+      "color": "#322",
+      "bgcolor": "#533"
+    }
+  ],
+  "links": [
+    [1,  1, 0, 3,  1, "IMAGE"],
+    [2,  2, 0, 3,  0, "SHARP_MODEL"],
+    [3,  3, 0, 4,  0, "STRING"],
+    [4,  3, 1, 4,  1, "EXTRINSICS"],
+    [5,  3, 2, 4,  2, "INTRINSICS"],
+    [6,  4, 0, 5,  1, "IMAGE"],
+    [8,  1, 0, 5,  0, "IMAGE"],
+    [9,  4, 0, 6,  1, "IMAGE"],
+    [11, 5, 1, 7,  0, "IMAGE"],
+    [12, 6, 0, 8,  0, "IMAGE"],
+    [14, 4, 0, 10, 1, "IMAGE"],
+    [17, 5, 0, 11, 2, "MASK"],
+    [20, 1, 0, 6,  0, "IMAGE"],
+    [22, 4, 0, 11, 0, "IMAGE"],
+    [25, 1, 0, 10, 0, "IMAGE"],
+    [26, 10, 0, 14, 0, "IMAGE"],
+    [27, 10, 0, 15, 0, "IMAGE"],
+    [28, 1, 0, 12, 1, "IMAGE"],
+    [29, 4, 1, 10, 2, "EXTRINSICS"],
+    [30, 3, 1, 10, 3, "EXTRINSICS"]
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "title": "LOCAL GPU — SHARP + Gaussian Splat",
+      "bounding": [-850, -820, 2200, 950],
+      "color": "#3f789e",
+      "font_size": 24
+    },
+    {
+      "id": 2,
+      "title": "ARTIFACT DETECTION (optional debug)",
+      "bounding": [1350, -660, 800, 450],
+      "color": "#8A6529",
+      "font_size": 24
+    },
+    {
+      "id": 3,
+      "title": "FAL.AI REPAIR (cloud)",
+      "bounding": [1350, 20, 1380, 700],
+      "color": "#3b8c5a",
+      "font_size": 24
+    },
+    {
+      "id": 4,
+      "title": "FINAL OUTPUT",
+      "bounding": [2250, 60, 550, 700],
+      "color": "#9e3f6e",
+      "font_size": 24
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.6,
+      "offset": [400, 500]
+    }
+  },
+  "version": 0.4
+}
